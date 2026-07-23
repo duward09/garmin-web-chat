@@ -29,7 +29,7 @@ if not gemini_api_key:
 genai.configure(api_key=gemini_api_key)
 
 # Menggunakan model paling stabil yang didukung secara universal
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-2.0-flash"
 model = genai.GenerativeModel(MODEL_NAME)
 
 def fetch_garmin_mcp_data():
