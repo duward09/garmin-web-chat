@@ -25,31 +25,8 @@ if not gemini_api_key:
     st.info("💡 Masukkan Gemini API Key Anda di sidebar (atau atur di Environment Variables Railway).")
     st.stop()
 
+# Konfigurasi Gemini API Key
 genai.configure(api_key=gemini_api_key)
-
-# Cache pemilihan model agar tidak memanggil list_models() setiap kali kirim pesan
-@st.cache_resource
-def get_active_model(api_key):
-    try:
-        models = [
-            m.name for m in genai.list_models() 
-            if "generateContent" in m.supported_generation_methods
-        ]
-        # Utamakan model stabil gemini-2.0-flash atau gemini-1.5-flash
-        for preferred in ["gemini-2.0-flash", "gemini-1.5-flash"]:
-            for m in models:
-                if preferred in m:
-                    return m
-        # Fallback ke model flash apa saja yang ada
-        for m in models:
-            if "flash" in m.lower():
-                return m
-        return models[0] if models else "gemini-2.0-flash"
-    except Exception:
-        return "gemini-2.0-flash"
-
-selected_model = get_active_model(gemini_api_key)
-model = genai.GenerativeModel(selected_model)
 
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -81,7 +58,7 @@ def fetch_garmin_mcp_data():
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Halo! Saya Garmin AI Coach Anda. Ada yang bisa saya bantu terkait analisis lari atau aktivitas Anda?"}
+        {"role": "assistant", "content": "Halo! Saya Garmin AI Coach Anda. Ada yang bisa saya bantu terkait analisis lari Anda?"}
     ]
 
 for msg in st.session_state.messages:
@@ -105,11 +82,23 @@ if user_input := st.chat_input("Tanyakan performa lari Anda..."):
         {user_input}
         """
 
-        try:
-            response = model.generate_content(system_prompt)
-            bot_response = response.text
-        except Exception as err:
-            bot_response = f"Gagal memproses respons AI ({selected_model}): {err}"
+        # Daftar kandidat model resmi yang didukung Google AI Studio
+        candidate_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+        bot_response = None
+        last_error = None
+
+        # Percobaan pemanggilan otomatis dengan fallback
+        for model_name in candidate_models:
+            try:
+                m = genai.GenerativeModel(model_name)
+                response = m.generate_content(system_prompt)
+                bot_response = response.text
+                break  # Jika berhasil, hentikan pencarian
+            except Exception as e:
+                last_error = e
+
+        if not bot_response:
+            bot_response = f"Gagal memproses respons AI: {last_error}"
 
     st.session_state.messages.append({"role": "assistant", "content": bot_response})
     st.chat_message("assistant").write(bot_response)
