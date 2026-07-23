@@ -25,8 +25,12 @@ if not gemini_api_key:
     st.info("💡 Masukkan Gemini API Key Anda di sidebar (atau atur di Environment Variables Railway).")
     st.stop()
 
-# Konfigurasi Gemini API Key
+# Konfigurasi SDK Google Gemini
 genai.configure(api_key=gemini_api_key)
+
+# Menggunakan model paling stabil yang didukung secara universal
+MODEL_NAME = "gemini-1.5-flash"
+model = genai.GenerativeModel(MODEL_NAME)
 
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -82,23 +86,11 @@ if user_input := st.chat_input("Tanyakan performa lari Anda..."):
         {user_input}
         """
 
-        # Daftar kandidat model resmi yang didukung Google AI Studio
-        candidate_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-        bot_response = None
-        last_error = None
-
-        # Percobaan pemanggilan otomatis dengan fallback
-        for model_name in candidate_models:
-            try:
-                m = genai.GenerativeModel(model_name)
-                response = m.generate_content(system_prompt)
-                bot_response = response.text
-                break  # Jika berhasil, hentikan pencarian
-            except Exception as e:
-                last_error = e
-
-        if not bot_response:
-            bot_response = f"Gagal memproses respons AI: {last_error}"
+        try:
+            response = model.generate_content(system_prompt)
+            bot_response = response.text
+        except Exception as err:
+            bot_response = f"Gagal memproses respons AI ({MODEL_NAME}): {err}"
 
     st.session_state.messages.append({"role": "assistant", "content": bot_response})
     st.chat_message("assistant").write(bot_response)
