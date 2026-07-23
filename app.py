@@ -26,8 +26,18 @@ if not gemini_api_key:
     st.stop()
 
 genai.configure(api_key=gemini_api_key)
-model = genai.GenerativeModel("gemini-2.5-flash")
 
+# Otomatis mendeteksi model Flash terbaru yang tersedia di API Key Anda
+def get_active_model():
+    try:
+        for m in genai.list_models():
+            if "generateContent" in m.supported_generation_methods and "flash" in m.name.lower():
+                return m.name
+    except Exception:
+        pass
+    return "gemini-2.0-flash"
+
+model = genai.GenerativeModel(get_active_model())
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     payload_call = {
