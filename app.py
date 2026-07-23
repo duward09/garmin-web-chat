@@ -1,5 +1,4 @@
 import streamlit as st
-import google.generativeai as genai
 import requests
 import json
 import os
@@ -24,13 +23,6 @@ with st.sidebar:
 if not gemini_api_key:
     st.info("💡 Masukkan Gemini API Key Anda di sidebar (atau atur di Environment Variables Railway).")
     st.stop()
-
-# Konfigurasi SDK Google Gemini
-genai.configure(api_key=gemini_api_key)
-
-# Menggunakan model paling stabil yang didukung secara universal
-MODEL_NAME = "gemini-2.0-flash"
-model = genai.GenerativeModel(MODEL_NAME)
 
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -60,6 +52,26 @@ def fetch_garmin_mcp_data():
         
     return {"status": "Tidak ada respon dari server MCP"}
 
+def call_gemini_api(prompt, api_key):
+    # Memanggil endpoint resmi v1beta Gemini 2.0 Flash via REST HTTP
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    if response.status_code == 200:
+        res_data = response.json()
+        try:
+            return res_data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError):
+            return "Format respon Gemini tidak sesuai."
+    else:
+        return f"Error Google API ({response.status_code}): {response.text}"
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Halo! Saya Garmin AI Coach Anda. Ada yang bisa saya bantu terkait analisis lari Anda?"}
@@ -86,11 +98,7 @@ if user_input := st.chat_input("Tanyakan performa lari Anda..."):
         {user_input}
         """
 
-        try:
-            response = model.generate_content(system_prompt)
-            bot_response = response.text
-        except Exception as err:
-            bot_response = f"Gagal memproses respons AI ({MODEL_NAME}): {err}"
+        bot_response = call_gemini_api(system_prompt, gemini_api_key)
 
     st.session_state.messages.append({"role": "assistant", "content": bot_response})
     st.chat_message("assistant").write(bot_response)
