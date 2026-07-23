@@ -26,7 +26,7 @@ if not gemini_api_key:
     st.stop()
 
 genai.configure(api_key=gemini_api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
