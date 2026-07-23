@@ -27,17 +27,30 @@ if not gemini_api_key:
 
 genai.configure(api_key=gemini_api_key)
 
-# Otomatis mendeteksi model Flash terbaru yang tersedia di API Key Anda
-def get_active_model():
+# Cache pemilihan model agar tidak memanggil list_models() setiap kali kirim pesan
+@st.cache_resource
+def get_active_model(api_key):
     try:
-        for m in genai.list_models():
-            if "generateContent" in m.supported_generation_methods and "flash" in m.name.lower():
-                return m.name
+        models = [
+            m.name for m in genai.list_models() 
+            if "generateContent" in m.supported_generation_methods
+        ]
+        # Utamakan model stabil gemini-2.0-flash atau gemini-1.5-flash
+        for preferred in ["gemini-2.0-flash", "gemini-1.5-flash"]:
+            for m in models:
+                if preferred in m:
+                    return m
+        # Fallback ke model flash apa saja yang ada
+        for m in models:
+            if "flash" in m.lower():
+                return m
+        return models[0] if models else "gemini-2.0-flash"
     except Exception:
-        pass
-    return "gemini-2.0-flash"
+        return "gemini-2.0-flash"
 
-model = genai.GenerativeModel(get_active_model())
+selected_model = get_active_model(gemini_api_key)
+model = genai.GenerativeModel(selected_model)
+
 def fetch_garmin_mcp_data():
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     payload_call = {
@@ -96,7 +109,7 @@ if user_input := st.chat_input("Tanyakan performa lari Anda..."):
             response = model.generate_content(system_prompt)
             bot_response = response.text
         except Exception as err:
-            bot_response = f"Gagal memproses respons AI: {err}"
+            bot_response = f"Gagal memproses respons AI ({selected_model}): {err}"
 
     st.session_state.messages.append({"role": "assistant", "content": bot_response})
     st.chat_message("assistant").write(bot_response)
